@@ -21,6 +21,10 @@ func NewProjectService(repo repositories.ProjectRepository) *ProjectService {
 		repo: repo,
 	}
 }
+
+// =====================
+// CREATE
+// =====================
 func (s *ProjectService) CreateProject(
 	ctx context.Context,
 	project *models.Project,
@@ -36,12 +40,18 @@ func (s *ProjectService) CreateProject(
 
 	project.CreatedAt = time.Now()
 
-	err := s.repo.Create(ctx, project)
-	if err != nil {
+	if err := s.repo.Create(ctx, project); err != nil {
 		return nil, err
 	}
 
 	return project, nil
+}
+
+// =====================
+// READ
+// =====================
+func (s *ProjectService) GetAllProjects(ctx context.Context) ([]models.Project, error) {
+	return s.repo.FindAll(ctx)
 }
 
 func (s *ProjectService) GetProjectByID(ctx context.Context, id string) (*models.Project, error) {
@@ -57,11 +67,25 @@ func (s *ProjectService) GetProjectByID(ctx context.Context, id string) (*models
 	return s.repo.FindByID(ctx, objID)
 }
 
-func (s *ProjectService) GetAllProjects(ctx context.Context) ([]models.Project, error) {
-	return s.repo.FindAll(ctx)
+func (s *ProjectService) GetProjectsByOwner(
+	ctx context.Context,
+	ownerID primitive.ObjectID,
+) ([]models.Project, error) {
+	return s.repo.FindByUserID(ctx, ownerID)
 }
 
-func (s *ProjectService) GetProjectsByUser(ctx context.Context, userIDStr string) ([]models.Project, error) {
+func (s *ProjectService) GetProjectsByMember(
+	ctx context.Context,
+	userID primitive.ObjectID,
+) ([]models.Project, error) {
+	return s.repo.FindByUserID(ctx, userID)
+}
+
+func (s *ProjectService) GetProjectsByUser(
+	ctx context.Context,
+	userIDStr string,
+) ([]models.Project, error) {
+
 	if userIDStr == "" {
 		return nil, errors.New("userId is required")
 	}
@@ -74,6 +98,9 @@ func (s *ProjectService) GetProjectsByUser(ctx context.Context, userIDStr string
 	return s.repo.FindByUserID(ctx, userID)
 }
 
+// =====================
+// UPDATE
+// =====================
 func (s *ProjectService) UpdateProject(ctx context.Context, id string, update bson.M) error {
 	if id == "" {
 		return errors.New("id is required")
@@ -87,6 +114,9 @@ func (s *ProjectService) UpdateProject(ctx context.Context, id string, update bs
 	return s.repo.UpdateByID(ctx, objID, update)
 }
 
+// =====================
+// DELETE
+// =====================
 func (s *ProjectService) DeleteProject(ctx context.Context, id string) error {
 	if id == "" {
 		return errors.New("id is required")

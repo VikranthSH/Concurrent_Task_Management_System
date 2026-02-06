@@ -13,14 +13,20 @@ import (
 )
 
 type UserService struct {
-	repo repositories.UserRepository
+	repo           repositories.UserRepository
+	projectService *ProjectService
 }
 
-func NewUserService(repo repositories.UserRepository) *UserService {
+func NewUserService(
+	repo repositories.UserRepository,
+	projectService *ProjectService,
+) *UserService {
 	return &UserService{
 		repo: repo,
+		projectService: projectService,
 	}
 }
+
 
 func (s *UserService) CreateUser(ctx context.Context, user *models.User) (*models.User, error) {
 
@@ -93,4 +99,32 @@ func (s *UserService) DeleteUser(ctx context.Context, id string) error {
 	}
 
 	return s.repo.DeleteByID(ctx, objID)
+}
+func (s *UserService) GetUsersUnderAdmin(
+	ctx context.Context,
+	adminID primitive.ObjectID,
+) ([]models.User, error) {
+
+	projects, err := s.projectService.GetProjectsByOwner(ctx, adminID)
+	if err != nil {
+		return nil, err
+	}
+
+	userMap := make(map[primitive.ObjectID]models.User)
+
+	for _, project := range projects {
+		for _, memberID := range project.MemberIDs {
+			user, err := s.repo.FindByID(ctx, memberID)
+			if err == nil {
+				userMap[user.ID] = *user
+			}
+		}
+	}
+
+	var users []models.User
+	for _, u := range userMap {
+		users = append(users, u)
+	}
+
+	return users, nil
 }

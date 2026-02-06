@@ -12,6 +12,7 @@ import (
 	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
+
 type TaskService struct {
 	repo repositories.TaskRepository
 }
@@ -20,6 +21,9 @@ func NewTaskService(repo repositories.TaskRepository) *TaskService {
 	return &TaskService{repo: repo}
 }
 
+// =====================
+// CREATE
+// =====================
 func (s *TaskService) CreateTask(ctx context.Context, task *models.Task) (*models.Task, error) {
 
 	if task.Title == "" {
@@ -30,7 +34,6 @@ func (s *TaskService) CreateTask(ctx context.Context, task *models.Task) (*model
 		return nil, errors.New("projectId is required")
 	}
 
-	// validate status
 	validStatus := map[string]bool{
 		"Todo":        true,
 		"In Progress": true,
@@ -41,7 +44,6 @@ func (s *TaskService) CreateTask(ctx context.Context, task *models.Task) (*model
 		return nil, errors.New("invalid status")
 	}
 
-	// defaults
 	if task.Status == "" {
 		task.Status = "Todo"
 	}
@@ -50,7 +52,6 @@ func (s *TaskService) CreateTask(ctx context.Context, task *models.Task) (*model
 		task.Priority = "Medium"
 	}
 
-	// validate due date
 	if !task.DueDate.IsZero() && task.DueDate.Before(time.Now()) {
 		return nil, errors.New("dueDate cannot be in the past")
 	}
@@ -66,6 +67,9 @@ func (s *TaskService) CreateTask(ctx context.Context, task *models.Task) (*model
 	return task, nil
 }
 
+// =====================
+// READ
+// =====================
 func (s *TaskService) GetTaskByID(ctx context.Context, id primitive.ObjectID) (*models.Task, error) {
 	if id == primitive.NilObjectID {
 		return nil, errors.New("id is required")
@@ -98,12 +102,16 @@ func (s *TaskService) GetTasksByStatus(ctx context.Context, status string) ([]mo
 	return s.repo.FindByStatus(ctx, status)
 }
 
+
+
+// =====================
+// UPDATE
+// =====================
 func (s *TaskService) UpdateTask(ctx context.Context, id primitive.ObjectID, update bson.M) error {
 	if id == primitive.NilObjectID {
 		return errors.New("id is required")
 	}
 
-	// prevent immutable updates
 	delete(update, "_id")
 	delete(update, "createdAt")
 
@@ -111,9 +119,24 @@ func (s *TaskService) UpdateTask(ctx context.Context, id primitive.ObjectID, upd
 	return s.repo.UpdateByID(ctx, id, update)
 }
 
+// =====================
+// DELETE
+// =====================
 func (s *TaskService) DeleteTask(ctx context.Context, id primitive.ObjectID) error {
 	if id == primitive.NilObjectID {
 		return errors.New("id is required")
 	}
 	return s.repo.DeleteByID(ctx, id)
+}
+// Used by Dashboard (ADMIN)
+func (s *TaskService) GetTasksByOwner(
+	ctx context.Context,
+	ownerID primitive.ObjectID,
+) ([]models.Task, error) {
+
+	if ownerID == primitive.NilObjectID {
+		return nil, errors.New("ownerId is required")
+	}
+
+	return s.repo.FindByAssignedUser(ctx, ownerID)
 }

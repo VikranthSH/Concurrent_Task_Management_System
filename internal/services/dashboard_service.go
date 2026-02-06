@@ -19,9 +19,9 @@ func NewDashboardService(
 	ts *TaskService,
 ) *DashboardService {
 	return &DashboardService{
-		userService: us,
+		userService:    us,
 		projectService: ps,
-		taskService: ts,
+		taskService:    ts,
 	}
 }
 
@@ -32,23 +32,88 @@ func (s *DashboardService) GetDashboard(
 
 	response := &dto.DashboardResponse{
 		CurrentUser: currentUser,
+		Users:       []dto.DashboardUser{},
 	}
 
-	switch currentUser.Role {
+	// Fetch all data once
+	users, _ := s.userService.GetAllUsers(ctx)
+	projects, _ := s.projectService.GetAllProjects(ctx)
+	tasks, _ := s.taskService.GetAllTasks(ctx)
 
-	case "super_admin":
-		response.Users, _ = s.userService.GetAllUsers(ctx)
-		response.Projects, _ = s.projectService.GetAllProjects(ctx)
-		response.Tasks, _ = s.taskService.GetAllTasks(ctx)
+	for _, u := range users {
 
-	case "admin":
-		response.Projects, _ = s.projectService.GetProjectsByOwner(ctx, currentUser.ID)
-		response.Tasks, _ = s.taskService.GetTasksByOwner(ctx, currentUser.ID)
-		response.Users, _ = s.userService.GetUsersUnderAdmin(ctx, currentUser.ID)
+		// =========================
+		// ROLE FILTERING
+		// =========================
+		if currentUser.Role == "employee" && u.ID != currentUser.ID {
+			continue
+		}
 
-	case "employee":
-		response.Projects, _ = s.projectService.GetProjectsByMember(ctx, currentUser.ID)
-		response.Tasks, _ = s.taskService.GetTasksByAssignedUser(ctx, currentUser.ID)
+		if currentUser.Role == "admin" {
+			isUnderAdmin := false
+			adminProjects, _ := s.projectService.GetProjectsByOwner(ctx, currentUser.ID)
+
+			for _, p := range adminProjects {
+				for _, m := range p.MemberIDs {
+					if m == u.ID {
+						isUnderAdmin = true
+					}
+				}
+			}
+
+			if !isUnderAdmin && u.ID != currentUser.ID {
+				continue
+			}
+		}
+
+		// =========================
+		// BUILD DASHBOARD USER
+		// =========================
+		dUser := dto.DashboardUser{
+			ID:        u.ID.Hex(),
+			UserID:    u.UserID,
+			Name:      u.Name,
+			Email:     u.Email,
+			Role:      u.Role,
+			CreatedAt: u.CreatedAt,
+			Projects:  []dto.DashboardProject{},
+		}
+
+		// =========================
+		// ATTACH PROJECTS & TASKS
+		// =========================
+		for _, p := range projects {
+
+			isMember := false
+			for _, m := range p.MemberIDs {
+				if m == u.ID {
+					isMember = true
+				}
+			}
+			if !isMember {
+				continue
+			}
+
+			dProject := dto.DashboardProject{
+				ID:    p.ID.Hex(),
+				Name:  p.Name,
+				Tasks: []dto.DashboardTask{},
+			}
+
+			for _, t := range tasks {
+				if t.ProjectID == p.ID && t.AssignedTo == u.ID {
+					dProject.Tasks = append(dProject.Tasks, dto.DashboardTask{
+						ID:     t.ID.Hex(),
+						Title:  t.Title,
+						Status: t.Status,
+					})
+				}
+			}
+
+			dUser.Projects = append(dUser.Projects, dProject)
+		}
+
+		response.Users = append(response.Users, dUser)
 	}
 
 	return response, nil
