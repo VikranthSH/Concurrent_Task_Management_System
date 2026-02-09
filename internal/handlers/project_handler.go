@@ -6,6 +6,7 @@ import (
 
 	"Concurrent_Task_Management_System/internal/models"
 	"Concurrent_Task_Management_System/internal/services"
+	"Concurrent_Task_Management_System/internal/utils"
 
 	"github.com/gorilla/mux"
 )
@@ -15,97 +16,132 @@ type ProjectHandler struct {
 }
 
 func NewProjectHandler(service *services.ProjectService) *ProjectHandler {
-	return &ProjectHandler{
-		service: service,
-	}
+	return &ProjectHandler{service: service}
 }
 
+// =========================
+// CREATE PROJECT
+// =========================
 func (h *ProjectHandler) CreateProject(w http.ResponseWriter, r *http.Request) {
 	var project models.Project
 
 	if err := json.NewDecoder(r.Body).Decode(&project); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		utils.SendError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
 	createdProject, err := h.service.CreateProject(r.Context(), &project)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		utils.SendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(createdProject)
+	utils.SendSuccess(
+		w,
+		http.StatusCreated,
+		"Project created successfully",
+		createdProject,
+	)
 }
 
+// =========================
+// GET PROJECT BY ID
+// =========================
 func (h *ProjectHandler) GetProjectByID(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
+	id := mux.Vars(r)["id"]
 
 	project, err := h.service.GetProjectByID(r.Context(), id)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+		utils.SendError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(project)
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Project fetched successfully",
+		project,
+	)
 }
 
+// =========================
+// GET ALL PROJECTS
+// =========================
 func (h *ProjectHandler) GetAllProjects(w http.ResponseWriter, r *http.Request) {
 	projects, err := h.service.GetAllProjects(r.Context())
 	if err != nil {
-		http.Error(w, "failed to fetch projects", http.StatusInternalServerError)
+		utils.SendError(w, http.StatusInternalServerError, "failed to fetch projects")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projects)
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Projects fetched successfully",
+		projects,
+	)
 }
 
+// =========================
+// GET PROJECTS BY USER
+// =========================
 func (h *ProjectHandler) GetProjectsByUser(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	userID := params["userId"]
+	userID := mux.Vars(r)["userId"]
 
 	projects, err := h.service.GetProjectsByUser(r.Context(), userID)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+		utils.SendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(projects)
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Projects fetched successfully",
+		projects,
+	)
 }
 
+// =========================
+// UPDATE PROJECT
+// =========================
 func (h *ProjectHandler) UpdateProject(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
+	id := mux.Vars(r)["id"]
 
 	var updateData map[string]interface{}
 	if err := json.NewDecoder(r.Body).Decode(&updateData); err != nil {
-		http.Error(w, "invalid request body", http.StatusBadRequest)
+		utils.SendError(w, http.StatusBadRequest, "invalid request body")
 		return
 	}
 
-	err := h.service.UpdateProject(r.Context(), id, updateData)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusBadRequest)
+	if err := h.service.UpdateProject(r.Context(), id, updateData); err != nil {
+		utils.SendError(w, http.StatusBadRequest, err.Error())
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Project updated successfully",
+		nil,
+	)
 }
 
+// =========================
+// DELETE PROJECT
+// =========================
 func (h *ProjectHandler) DeleteProject(w http.ResponseWriter, r *http.Request) {
-	params := mux.Vars(r)
-	id := params["id"]
+	id := mux.Vars(r)["id"]
 
-	err := h.service.DeleteProject(r.Context(), id)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusNotFound)
+	if err := h.service.DeleteProject(r.Context(), id); err != nil {
+		utils.SendError(w, http.StatusNotFound, err.Error())
 		return
 	}
 
-	w.WriteHeader(http.StatusNoContent)
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Project deleted successfully",
+		nil,
+	)
 }

@@ -1,28 +1,42 @@
 package services
 
 import (
-	"context"
-
 	"Concurrent_Task_Management_System/internal/dto"
 	"Concurrent_Task_Management_System/internal/models"
+	"Concurrent_Task_Management_System/internal/repositories"
+	"Concurrent_Task_Management_System/internal/utils"
+	"context"
+
+	"go.mongodb.org/mongo-driver/bson"
+	"go.mongodb.org/mongo-driver/bson/primitive"
 )
 
 type DashboardService struct {
-	userService    *UserService
-	projectService *ProjectService
-	taskService    *TaskService
+	dashboardRepo repositories.DashboardRepository
+	userService   *UserService
 }
 
 func NewDashboardService(
-	us *UserService,
-	ps *ProjectService,
-	ts *TaskService,
+	dashboardRepo repositories.DashboardRepository,
+	userService *UserService,
 ) *DashboardService {
 	return &DashboardService{
-		userService:    us,
-		projectService: ps,
-		taskService:    ts,
+		dashboardRepo: dashboardRepo,
+		userService:   userService,
 	}
+}
+
+func (s *DashboardService) GetUserFromJWT(
+	ctx context.Context,
+	claims *utils.Claims,
+) (*models.User, error) {
+
+	objID, err := primitive.ObjectIDFromHex(claims.UserID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.userService.GetUserByObjectID(ctx, objID)
 }
 
 func (s *DashboardService) GetDashboard(
@@ -32,80 +46,46 @@ func (s *DashboardService) GetDashboard(
 
 	response := &dto.DashboardResponse{
 		CurrentUser: currentUser,
-		Users:       []dto.DashboardUser{},
 	}
 
-	// Fetch all data once
-	users, _ := s.userService.GetAllUsers(ctx)
-	projects, _ := s.projectService.GetAllProjects(ctx)
-	tasks, _ := s.taskService.GetAllTasks(ctx)
+	if currentUser.Role != "admin" {
+		return response, nil
+	}
 
-	for _, u := range users {
+	rawUsers, err := s.dashboardRepo.GetAdminDashboard(ctx, currentUser.ID.Hex())
+	if err != nil {
+		return nil, err
+	}
 
-		// =========================
-		// ROLE FILTERING
-		// =========================
-		if currentUser.Role == "employee" && u.ID != currentUser.ID {
-			continue
-		}
+	for _, ru := range rawUsers {
 
-		if currentUser.Role == "admin" {
-			isUnderAdmin := false
-			adminProjects, _ := s.projectService.GetProjectsByOwner(ctx, currentUser.ID)
-
-			for _, p := range adminProjects {
-				for _, m := range p.MemberIDs {
-					if m == u.ID {
-						isUnderAdmin = true
-					}
-				}
-			}
-
-			if !isUnderAdmin && u.ID != currentUser.ID {
-				continue
-			}
-		}
-
-		// =========================
-		// BUILD DASHBOARD USER
-		// =========================
 		dUser := dto.DashboardUser{
-			ID:        u.ID.Hex(),
-			UserID:    u.UserID,
-			Name:      u.Name,
-			Email:     u.Email,
-			Role:      u.Role,
-			CreatedAt: u.CreatedAt,
-			Projects:  []dto.DashboardProject{},
+			ID:     ru["_id"].(primitive.ObjectID).Hex(),
+			UserID: ru["user_id"].(string),
+			Name:   ru["name"].(string),
+			Role:   ru["role"].(string),
 		}
 
-		// =========================
-		// ATTACH PROJECTS & TASKS
-		// =========================
+		projects, _ := ru["projects"].(primitive.A)
+		tasks, _ := ru["tasks"].(primitive.A)
+
 		for _, p := range projects {
 
-			isMember := false
-			for _, m := range p.MemberIDs {
-				if m == u.ID {
-					isMember = true
-				}
-			}
-			if !isMember {
-				continue
-			}
+			pMap := p.(bson.M)
+			projectID := pMap["_id"].(primitive.ObjectID)
 
 			dProject := dto.DashboardProject{
-				ID:    p.ID.Hex(),
-				Name:  p.Name,
-				Tasks: []dto.DashboardTask{},
+				ID:   projectID.Hex(),
+				Name: pMap["name"].(string),
 			}
 
 			for _, t := range tasks {
-				if t.ProjectID == p.ID && t.AssignedTo == u.ID {
+				tMap := t.(bson.M)
+
+				if tMap["projectId"].(primitive.ObjectID) == projectID {
 					dProject.Tasks = append(dProject.Tasks, dto.DashboardTask{
-						ID:     t.ID.Hex(),
-						Title:  t.Title,
-						Status: t.Status,
+						Title:  tMap["title"].(string),
+						Status: tMap["status"].(string),
 					})
 				}
 			}

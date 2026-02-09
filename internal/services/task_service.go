@@ -77,6 +77,19 @@ func (s *TaskService) GetTaskByID(ctx context.Context, id primitive.ObjectID) (*
 	return s.repo.FindByID(ctx, id)
 }
 
+// Used by Dashboard (ADMIN)
+func (s *TaskService) GetTasksByProjects(
+	ctx context.Context,
+	projectIDs []primitive.ObjectID,
+) ([]models.Task, error) {
+
+	if len(projectIDs) == 0 {
+		return []models.Task{}, nil
+	}
+
+	return s.repo.FindByProjectIDs(ctx, projectIDs)
+}
+
 func (s *TaskService) GetAllTasks(ctx context.Context) ([]models.Task, error) {
 	return s.repo.FindAll(ctx)
 }

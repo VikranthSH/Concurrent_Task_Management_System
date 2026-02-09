@@ -15,6 +15,9 @@ type TaskRepository interface {
 	FindByID(ctx context.Context, id primitive.ObjectID) (*models.Task, error)
 	FindAll(ctx context.Context) ([]models.Task, error)
 	FindByProjectID(ctx context.Context, projectID primitive.ObjectID) ([]models.Task, error)
+
+	FindByProjectIDs(ctx context.Context, projectIDs []primitive.ObjectID) ([]models.Task, error)
+
 	FindByAssignedUser(ctx context.Context, userID primitive.ObjectID) ([]models.Task, error)
 	FindByStatus(ctx context.Context, status string) ([]models.Task, error)
 	UpdateByID(ctx context.Context, id primitive.ObjectID, update bson.M) error
@@ -122,4 +125,26 @@ func (r *taskRepository) UpdateByID(ctx context.Context, id primitive.ObjectID, 
 func (r *taskRepository) DeleteByID(ctx context.Context, id primitive.ObjectID) error {
 	_, err := r.collection.DeleteOne(ctx, bson.M{"_id": id})
 	return err
+}
+func (r *taskRepository) FindByProjectIDs(
+	ctx context.Context,
+	projectIDs []primitive.ObjectID,
+) ([]models.Task, error) {
+
+	filter := bson.M{
+		"projectId": bson.M{"$in": projectIDs},
+	}
+
+	cursor, err := r.collection.Find(ctx, filter)
+	if err != nil {
+		return nil, err
+	}
+	defer cursor.Close(ctx)
+
+	var tasks []models.Task
+	if err := cursor.All(ctx, &tasks); err != nil {
+		return nil, err
+	}
+
+	return tasks, nil
 }

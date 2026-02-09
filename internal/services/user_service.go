@@ -128,3 +128,31 @@ func (s *UserService) GetUsersUnderAdmin(
 
 	return users, nil
 }
+
+func (s *UserService) GetUserByIDFromJWT(
+	ctx context.Context,
+	userID string,
+) (*models.User, error) {
+
+	objID, err := primitive.ObjectIDFromHex(userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return s.GetUserByObjectID(ctx, objID)
+}
+
+
+func (s *UserService) GetUserByUserID(
+	ctx context.Context,
+	userID string,
+) (*models.User, error) {
+	return s.repo.FindByUserID(ctx, userID)
+}
+func (s *UserService) GetUserByObjectID(
+	ctx context.Context,
+	id primitive.ObjectID,
+) (*models.User, error) {
+
+	return s.repo.FindByID(ctx, id)
+}

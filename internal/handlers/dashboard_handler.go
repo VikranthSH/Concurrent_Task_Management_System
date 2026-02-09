@@ -1,31 +1,66 @@
 package handlers
 
 import (
-	"encoding/json"
 	"net/http"
+	"strings"
 
-	"Concurrent_Task_Management_System/internal/models"
 	"Concurrent_Task_Management_System/internal/services"
+	"Concurrent_Task_Management_System/internal/utils"
 )
 
 type DashboardHandler struct {
-	service *services.DashboardService
+	dashboardService *services.DashboardService
+	userService      *services.UserService
 }
 
-func NewDashboardHandler(service *services.DashboardService) *DashboardHandler {
-	return &DashboardHandler{service: service}
+func NewDashboardHandler(
+	dashboardService *services.DashboardService,
+	userService *services.UserService,
+) *DashboardHandler {
+	return &DashboardHandler{
+		dashboardService: dashboardService,
+		userService:      userService,
+	}
 }
 
 func (h *DashboardHandler) GetDashboard(w http.ResponseWriter, r *http.Request) {
 
-	currentUser := r.Context().Value("currentUser").(*models.User)
-
-	result, err := h.service.GetDashboard(r.Context(), currentUser)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusForbidden)
+	authHeader := r.Header.Get("Authorization")
+	if authHeader == "" {
+		utils.SendError(w, http.StatusUnauthorized, "Authorization header missing")
 		return
 	}
 
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(result)
+	tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
+	claims, err := utils.ParseJWT(tokenStr)
+	if err != nil {
+		utils.SendError(w, http.StatusUnauthorized, "Invalid token")
+		return
+	}
+
+	// ✅ JWT → DB User
+	currentUser, err := h.userService.GetUserByIDFromJWT(
+		r.Context(),
+		claims.UserID,
+	)
+	if err != nil {
+		utils.SendError(w, http.StatusUnauthorized, "User not found")
+		return
+	}
+
+	result, err := h.dashboardService.GetDashboard(
+		r.Context(),
+		currentUser,
+	)
+	if err != nil {
+		utils.SendError(w, http.StatusForbidden, err.Error())
+		return
+	}
+
+	utils.SendSuccess(
+		w,
+		http.StatusOK,
+		"Dashboard fetched successfully",
+		result,
+	)
 }

@@ -71,14 +71,14 @@ func (s *ProjectService) GetProjectsByOwner(
 	ctx context.Context,
 	ownerID primitive.ObjectID,
 ) ([]models.Project, error) {
-	return s.repo.FindByUserID(ctx, ownerID)
+	return s.repo.FindByOwnerID(ctx, ownerID)
 }
 
 func (s *ProjectService) GetProjectsByMember(
 	ctx context.Context,
 	userID primitive.ObjectID,
 ) ([]models.Project, error) {
-	return s.repo.FindByUserID(ctx, userID)
+	return s.repo.FindByMemberID(ctx, userID)
 }
 
 func (s *ProjectService) GetProjectsByUser(
@@ -95,7 +95,17 @@ func (s *ProjectService) GetProjectsByUser(
 		return nil, errors.New("invalid userId")
 	}
 
-	return s.repo.FindByUserID(ctx, userID)
+	projectsByOwner, err := s.repo.FindByOwnerID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	projectsByMember, err := s.repo.FindByMemberID(ctx, userID)
+	if err != nil {
+		return nil, err
+	}
+
+	return append(projectsByOwner, projectsByMember...), nil
 }
 
 // =====================
