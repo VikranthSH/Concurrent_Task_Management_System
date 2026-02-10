@@ -22,23 +22,21 @@ The main goal of this project is to:
     -Indexes
     -Aggregation pipeline ($lookup, $match, $project)
 
-<!-- Project Structure -->
-Concurrent_Task_Management_System/
-│
-├── cmd/
+## Project Structure
 
+```text
+Concurrent_Task_Management_System/
+├── cmd/
 │   └── server/
 │       └── main.go
-│
 ├── internal/
-│   ├── handlers/        // HTTP layer (request/response)
-│   ├── services/        // Business logic
-│   ├── repositories/   // MongoDB access
-│   ├── models/          // DB models
-│   ├── dto/             // Response structures
-│   ├── routes/          // Route registration
-│   └── utils/           // JWT, responses, indexes
-│
+│   ├── handlers/        # HTTP layer (request/response)
+│   ├── services/        # Business logic
+│   ├── repositories/   # MongoDB access
+│   ├── models/          # DB models
+│   ├── dto/             # Response structures
+│   ├── routes/          # Route registration
+│   └── utils/           # JWT, responses, indexes
 └── go.mod
 
 
